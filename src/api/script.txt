@@ -1,0 +1,88 @@
+const fetch1 = async () => {
+    const url = 'https://magnetic-tested-hardware.glitch.me'
+    const authToken = '7b806c29-a46f-446e-82e1-16f032627963'
+
+    const data = await fetch(url + '/api/v2/customer', {
+        method: 'GET',
+        headers: {
+            authorization: authToken,
+        }
+    })
+
+    return await data.json()
+}
+
+
+const fetch2 = async (type, endpoint, body) => {
+    const url = 'https://guttural-deciduous-webserver.glitch.me'
+    const authToken = '9eb514d1-61ae-4bdb-ae6b-124fc6722c1f'
+
+    const data = body ? await fetch(url + endpoint, {
+        method: type,
+        body: JSON.stringify(body),
+        headers: {
+            authorization: authToken,
+        }
+    }) : await fetch(url + endpoint, {
+        method: type,
+        headers: {
+            authorization: authToken,
+        }
+    })
+
+    return await data.json()
+}
+
+const syncData = async () => {
+    try {
+        const api1Data = await fetch1()
+        const api2Data = await fetch2('GET', '/api/v3/client')
+
+        const syncPromises = []
+
+        api1Data.forEach((item) => {
+            const match = api2Data.find(o => o.name === item.name)
+
+            if (!match) {
+                console.log("found no match, add to api")
+
+                syncPromises.push(
+                    fetch2('POST', '/api/v3/client', item)
+                        .then(response => {
+                            console.log(`Added ${item.name}:`, response)
+                            return response
+                        })
+                )
+            } else {
+                console.log('found match! check other values')
+
+                const fieldsToCompare = ['activeAt', 'arr', 'teamMemberId']
+
+                const updates = {}
+
+                fieldsToCompare.forEach(field => {
+                    if (item[field] !== match[field]) {
+                        console.log("update field:", field)
+                        updates[field] = item[field]
+                    }
+                })
+
+                syncPromises.push(
+                    fetch2('PUT', `/api/v3/client/${match.id}`, updates)
+                        .then(response => {
+                            console.log(`Updated ${item.name}:`, response)
+                            return response
+                        })
+                )
+            }
+        })
+
+        await Promise.all(syncPromises)
+        console.log("sync completed!")
+    } catch (error) {
+        console.log("sync failed")
+        console.error(error)
+    }
+}
+
+syncData()
